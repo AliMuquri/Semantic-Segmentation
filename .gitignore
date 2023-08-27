@@ -1,0 +1,22 @@
+*.npy
+*.png
+env/
+labelme/
+Dev/
+to_remove/
+main_program_training/dataset_voc/
+main_program_training/fine_tuned_model/
+main_program_training/transfer_model/
+main_program_training/PreviousRUNS/
+main_program_benchmark/PreviousRUNS/
+main_program_benchmark/dataset_voc/
+main_program_benchmark/transfer_model/
+main_program_benchmark/fine_tuned_model/
+main_program_VOC/dataset/
+main_program_aggregations/dataset_voc/
+main_program_aggregations/fine_tuned_model/
+main_program_aggregations/save_npy/
+main_program_aggregations/saved_images/
+Negative Samples/
+REMOVED IMAGES/
+YEAST EXAMEN/
