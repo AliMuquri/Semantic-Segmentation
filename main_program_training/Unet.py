@@ -66,7 +66,7 @@ class Unet(Model):
     """In the VGG19-U-Net architecture the encoder blocks of the U-Net model is replaced
     with VGG19 model. """
 
-    def _init__(self, pre_train_model):
+    def __init__(self, pre_train_model):
         super(Unet, self).__init__()
 
         self.encoder = pre_train_model

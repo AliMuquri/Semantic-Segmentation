@@ -1,6 +1,7 @@
 from tensorflow.keras.models import Model
 from tensorflow.keras import layers
 from tensorflow.keras import utils
+import os
 
 WEIGHTS_PATH_NO_TOP = ('https://github.com/fchollet/deep-learning-models/'
                        'releases/download/v0.1/'
@@ -129,4 +130,26 @@ class VGG19(Model):
 
     def load(self):
         """ This method loads the pre trained weights from Tensorflow."""
+        weights_filename = 'vgg19_weights_tf_dim_ordering_tf_kernels_notop.h5'
+        cache_subdir = 'models'
+        file_hash = '253f8cb515780f3b799900260a226db6'
+
+        # Check if the weights file already exists
+        if not os.path.exists(os.path.join(cache_subdir, weights_filename)):
+            WEIGHTS_PATH_NO_TOP = ('https://github.com/fchollet/deep-learning-models/'
+                                'releases/download/v0.1/'
+                                'vgg19_weights_tf_dim_ordering_tf_kernels_notop.h5')
+
+            # Download the weights if they don't exist
+            weights_path = utils.get_file(
+                weights_filename,
+                WEIGHTS_PATH_NO_TOP,
+                cache_subdir=cache_subdir,
+                file_hash=file_hash
+            )
+
+            print("Weights downloaded and saved at:", weights_path)
+        else:
+            print("Weights file already exists. Skipping download.")
+        
         self.load_weights(weights_path)

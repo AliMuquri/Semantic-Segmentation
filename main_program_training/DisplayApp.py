@@ -144,7 +144,7 @@ class DisplayApp():
 
             plt.show(block=False)
 
-            if  self.epoch % 5 == 0:
+            if  self.epoch % 1 == 0:
                 plt.savefig(os.path.join(self.folder_path_saved,"PIC_" + str(self.epoch) +".png"), bbox_inches='tight')
         except Exception as e:
             print(e)

@@ -8,6 +8,8 @@ import time
 
 
 class FolderStructureError(Exception):
+    """This exception is raised when a path way is given that follows a different multi folder structure
+    then what is expected (train, test, val)"""
     def __init__(self, message):
         self.message = "{} is not permitted FolderStructure. Please follow train, test, val ".format(message)
         super().__init__(self, message)
@@ -112,7 +114,7 @@ class VOC():
                 if not os.path.isdir(new_output_path):
                     os.mkdir(new_output_path)
                 #os.mkdir(os.path.join(output_path, filename.removesuffix('.json')))
-                cmd =' labelme_json_to_dataset ' + os.path.join(input_path, filename) + ' -o ' + new_output_path
+                cmd =r'labelme_json_to_dataset "{}" -o "{}" '.format(os.path.join(input_path, filename), new_output_path)
                 process = subprocess.Popen(cmd, shell=True, stdout=DEVNULL, stderr=DEVNULL)
                 processes.append(process)
                 print("{} of {} jsons has been turned into VOC".format(len(processes), tot), end='\r')

@@ -10,9 +10,7 @@ import itertools
 
 
 class ImageDataGeneratorSplit():
-    """This class merges the input paths from the val and train trainset and splits them. """
     def __init__(self, input_shape, batch_size, data_path, val_path, this_run_path=None,  old_run_path=None, split=0.1, multiprocessing=False):
-        
         self.input_shape = input_shape
         self.batch_size = batch_size
         self.multiprocessing = multiprocessing
@@ -34,13 +32,11 @@ class ImageDataGeneratorSplit():
         val_size = math.ceil(merg_size * split)
         sample_indices = None
 
-        #If this is an continuation of a old run the correct dataset is loaded.
         if type(old_run_path)!= type(None):
             with open(os.path.join(old_run_path,"sample_indices.txt"), 'r') as f:
                 indices = f.read()
                 sample_indices = [int(ind) for ind in indices.split(',')[:-1]]
         else:
-            #The sample indices are randomized so the split is not the same
             sample_indices = random.sample(range(merg_size), val_size)
 
         with open(os.path.join(this_run_path, "sample_indices.txt"), 'w') as f:
@@ -63,10 +59,7 @@ class ImageDataGeneratorSplit():
         return train_gen, val_gen
 
 class ImageDataGenerator(tf.keras.utils.Sequence):
-    
-    """Some methods in this datagenerator has been put as static method because tf.py_function 
-    is primarly for graph execution but object method are often eager which results in failure"""
-
+    #https://medium.com/analytics-vidhya/write-your-own-custom-data-generator-for-tensorflow-keras-1252b64e41c3
     def __init__(self, input_shape, batch_size, path, split=False, multiprocessing=False, train=False):
         self.input_shape = input_shape
         self.batch_size = batch_size # when using tf dataset
@@ -86,7 +79,7 @@ class ImageDataGenerator(tf.keras.utils.Sequence):
         self.data_size = len(self.images_path)
         self.len = self.__len__()
 
-        #Save the loaded images to increase speed
+
         self.images_loaded = {}
         self.masks_loaded = {}
         # self.images = [np.array(Image.open(os.path.join(image_path,  name))) \
@@ -94,23 +87,20 @@ class ImageDataGenerator(tf.keras.utils.Sequence):
         # self.masks = [np.array(Image.open(os.path.join(mask_path,  name))) \
         #  for name in os.listdir(mask_path)]
 
-        #Randomized indices so the the dataset is not repeated in the same pattern
         self.shuffled_indices = [x for x in range(self.data_size)]
         random.shuffle(self.shuffled_indices)
 
 
     def __len__(self):
-        #If multiprocessing is used the batch size is set 1 to avoid double batches(since tf data batch is called also)
         batch_size = 1 if self.multiprocessing else self.batch_size
+
         return math.ceil(self.data_size/batch_size)
 
     def getitem(self, index):
-        """A public method for enabling the migration of tf sequence to tf data"""
         return self.__getitem__(index)
 
     def __getitem__(self, index):
         original_index = index
-         #If multiprocessing is used the batch size is set 1 to avoid double batches(since tf data batch is called also)
         batch_size = 1 if self.multiprocessing else self.batch_size
         index = self.shuffled_indices[index]
 
@@ -145,7 +135,6 @@ class ImageDataGenerator(tf.keras.utils.Sequence):
 
     @staticmethod
     def clean_info_box(arr):
-        """The function removes an information box that is on the images of the training data"""
         new_arr = arr.copy()
         min_row, max_row, min_col, max_col = 1855,1903, 2345,2542
         for i in range(3):
@@ -159,10 +148,6 @@ class ImageDataGenerator(tf.keras.utils.Sequence):
 
     @staticmethod
     def zero_center_image(image):
-        """ This function zero centers the image with respect to the mean values of ImageNet set
-         image -- is the image during preprocessing, numpy array
-        
-           """
         mean = np.array([103.939, 116.779, 123.68])
         image = image[..., ::-1]
         image = image.astype(np.float32)
@@ -173,8 +158,6 @@ class ImageDataGenerator(tf.keras.utils.Sequence):
 
     @staticmethod
     def data_augment_brightness_sharpness_color_constrast(img, mask):
-
-        """"""
         img = Image.fromarray(np.uint8(img))
         factor = random.uniform(0.75,1.25)
         enhancer = ImageEnhance.Brightness(img)
@@ -186,12 +169,6 @@ class ImageDataGenerator(tf.keras.utils.Sequence):
 
     @staticmethod
     def data_augment_rot(img, mask):
-        """This function rotates the image and mask
-        
-        Arguments:
-        img -- is the image during preprocessing, numpy array
-        mask -- is the image annotation mask during preproccesing, numpy array"""
-
         num = random.uniform(0,1)
         img = tf.keras.preprocessing.image.apply_affine_transform(x=img, row_axis=0, col_axis=1, channel_axis=2, theta=360*num,  fill_mode='reflect')
         mask = tf.keras.preprocessing.image.apply_affine_transform(x=mask, row_axis=0, col_axis=1, channel_axis=2, theta=360*num,  fill_mode='reflect')
@@ -200,26 +177,20 @@ class ImageDataGenerator(tf.keras.utils.Sequence):
 
     @staticmethod
     def data_augment_flip(img, mask):
-        """This function flips the image and mask
-
-        Arguments:
-        img -- is the image during preprocessing, numpy array
-        mask -- is the image annotation mask during preproccesing, numpy array"""
         img = tf.image.flip_left_right(img)
         mask = tf.image.flip_left_right(mask)
         return np.array(img), np.array(mask)
 
     @staticmethod
+    def data_augment_gaussian_noise(img, mask):
+        img = tf.keras.layers.GaussianNoise(1e-1)(img)
+        return img.numpy(), mask
+
+
+
+    @staticmethod
     def data_augment_crop(img, mask_in, input_shape, val):
-        """ This function crops the images randomly. It utilize an algorithm that can target positive segment to 
-         decrease the number of entirely negative areas. This speeds up the training
-         
-        Argument:
-        img -- is the image during preprocessing, numpy array
-        mask_in -- is the image annotation mask during preproccesing, numpy array
-        input_shape: is the desired shape of the image, tuple
-        val -- is an option that only allows for positive segment targeting """
-        
+
         height = input_shape[0]
         width = input_shape[1]
         max_heigth = img.shape[0]
@@ -270,13 +241,6 @@ class ImageDataGenerator(tf.keras.utils.Sequence):
 
     @staticmethod
     def neg_samples(mask):
-        """ This function is important for removing an annotation dot in the mask.
-        All negative images were assigned a small dot of positive segment because labelme did not
-        allow for saving of empty masks.
-        
-        Argument:
-        mask -- is the image annotation mask"""
-
         rows_with_labels, cols_with_labels = mask.squeeze().nonzero()
         if len(rows_with_labels) < 100 and len(cols_with_labels) < 100:
             mask = np.zeros_like(mask)
@@ -291,6 +255,8 @@ class ImageDataGenerator(tf.keras.utils.Sequence):
             input_shape = tuple(input_shape.numpy().copy())
         except:
             pass
+
+
 
         nums = [random.randint(0,20) for _ in range(5)]
 
