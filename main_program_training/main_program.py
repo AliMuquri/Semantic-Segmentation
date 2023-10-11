@@ -35,11 +35,11 @@ val_mask_paths = [os.path.join(val_masks, filename) for filename in os.listdir(v
 #batch_size = 8
 
 #crop size
-crop_size = (512,512)
+crop_size = (224,224)
 
 #The input size to the tensorflow model
-input_shape = (None,512,512,3) #(None,224,224,3) #(None,1024,1024,3)
-input_shape_mask = (None,512,512,1) #(None,224,224,1)
+input_shape = (None,224,224,3) #(None,224,224,3) #(None,1024,1024,3)
+input_shape_mask = (None,224,224,1) #(None,224,224,1)
 
 
 #The size of the images in the dataset
@@ -66,7 +66,6 @@ load_weights = False
 
 #The path to the weights of the checkpoint is given here.
 path = None
-
 #The callbacks needs the path to where the training data history is saved.
 old_checkpoint_path = path if path else None
 path_to_old_run = os.path.dirname(old_checkpoint_path) if type(old_checkpoint_path)!=type(None) else None
@@ -87,16 +86,6 @@ def load(path_img, path_mask):
     mask = tf.expand_dims(mask, axis=0)
     return img, mask
 
-#Remove positive spot on the mask related labelme wouldn't allow saving negative masks
-
-def neg_samples(img, mask):
-    mask_squeeze = tf.squeeze(mask)
- 
-    non_zero_row_col = tf.where(mask_squeeze > 0)
-    if tf.size(non_zero_row_col) < 100:
-        mask = tf.zeros_like(mask)
-    #print(tf.size(non_zero_row_col))
-    return img, mask
 
 #Used for cropping the images
 @tf.function
@@ -127,7 +116,7 @@ def crop_images(img, mask):
 
 @tf.function
 def random_image_manipulations(img, mask):
-    factor = 0.2
+    factor = 0.5
     img = tf.image.random_brightness(img, max_delta = factor)
 
     return img, mask
@@ -304,18 +293,15 @@ def main():
     train_dataset = train_dataset.map(load, num_parallel_calls=tf.data.AUTOTUNE)
     val_dataset = val_dataset.map(load, num_parallel_calls=tf.data.AUTOTUNE)
     
-    #remove positive spots on negative segments and remove info box
-    train_dataset = train_dataset.map(neg_samples, num_parallel_calls=tf.data.AUTOTUNE)\
-            .map(remove_info_box, num_parallel_calls=tf.data.AUTOTUNE)
-    val_dataset = val_dataset.map(neg_samples, num_parallel_calls=tf.data.AUTOTUNE)\
-            .map(remove_info_box, num_parallel_calls=tf.data.AUTOTUNE)
+    #remove remove info box
+    train_dataset = train_dataset.map(remove_info_box, num_parallel_calls=tf.data.AUTOTUNE)
+    val_dataset = val_dataset.map(remove_info_box, num_parallel_calls=tf.data.AUTOTUNE)
 
     #preprocess the image
     train_dataset = train_dataset.map(zero_center_image, num_parallel_calls=tf.data.AUTOTUNE)\
             .map(convert_rbg_brg, num_parallel_calls=tf.data.AUTOTUNE)
     val_dataset = val_dataset.map(zero_center_image, num_parallel_calls=tf.data.AUTOTUNE)\
             .map(convert_rbg_brg, num_parallel_calls=tf.data.AUTOTUNE)
-
 
     #Augmentations
     train_dataset = train_dataset.map(crop_images, num_parallel_calls=tf.data.AUTOTUNE)\
@@ -332,12 +318,12 @@ def main():
     train_dataset = train_dataset.map(remove_batch_dimension, num_parallel_calls=tf.data.AUTOTUNE)
     val_dataset = val_dataset.map(remove_batch_dimension, num_parallel_calls=tf.data.AUTOTUNE)
 
-    #finally reduce to 1 channel for mask.
+    # #finally reduce to 1 channel for mask.
     train_dataset = train_dataset.map(convert_mask_to_single_channel, num_parallel_calls=tf.data.AUTOTUNE)
     val_dataset = val_dataset.map(convert_mask_to_single_channel, num_parallel_calls=tf.data.AUTOTUNE)
 
-    train_dataset = train_dataset.batch(8).prefetch(buffer_size=tf.data.AUTOTUNE)
-    val_dataset = val_dataset.batch(8).prefetch(buffer_size=tf.data.AUTOTUNE)
+    train_dataset = train_dataset.batch(16).prefetch(buffer_size=tf.data.AUTOTUNE)
+    val_dataset = val_dataset.batch(16).prefetch(buffer_size=tf.data.AUTOTUNE)
 
     
     # for i in train_dataset:
@@ -367,16 +353,15 @@ def main():
     if not fine_tune_model:
         #The hyperparameters for first time runs or checkpoints
         learning_rate = 1e-3
-        min_lr = 1e-5
-        patience=1
-        factor = 0.5
+        min_lr = 1e-7
+        patience=2
+        factor = 0.8
         pre_train_model = VGG19()
-        pre_train_model.build(input_shape)
-        pre_train_model.load()
         pre_train_model.trainable=False
         epochs= 100
         model = Unet(pre_train_model)
         model.build(input_shape)
+        model.layers[0].load()
         model.summary(expand_nested=True)
 
         if load_weights:
@@ -405,7 +390,7 @@ def main():
 
     #The model is compiled with the following optimizer, cost function, and performance metric. 
     model.compile(optimizer=tf.keras.optimizers.Adamax(),
-                loss=Utils_yeast.TverskyLoss(beta=0.5),
+                loss=Utils_yeast.TverskyLoss(beta=1),
                 metrics= [tf.keras.metrics.BinaryIoU(target_class_ids=[0, 1], threshold=0.5)\
                           ,tf.keras.metrics.IoU(num_classes=2, target_class_ids=[0])\
                         , tf.keras.metrics.IoU(num_classes=2, target_class_ids=[1])])
